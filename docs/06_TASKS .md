@@ -43,7 +43,9 @@ Done when: every page shows the strip, bar, navbar, footer; keyboard navigation 
 ```
 Read 05_SITE_CONTENT.md (Home) and 02_DESIGN_SYSTEM.md (Motion, Imagery).
 Build the Home page sections in components/sections: Hero, ServicesGrid, Process, TeamPreview, FeesSnapshot, Faq (shadcn Accordion), CtaBand. The Hero animation must be CSS keyframes only (no JS needed for first paint). Below-the-fold sections use the Reveal component. No testimonials, ratings, statistics or credentials.
-For images: list the exact filenames, dimensions and suggested search terms I should place in /public/images, use those paths via next/image with explicit width and height, and wait for me if files are missing instead of inventing placeholders.
+Images: use Unsplash direct image URLs only (images.unsplash.com). Add that host to next.config images.remotePatterns and use next/image with explicit width and height (priority only on the hero).
+Never invent photo IDs. Use only URLs you have actually opened or fetched and confirmed return HTTP 200 and match the subject (calm dental or clinic interiors, natural light, tools, hands, texture; no close-ups of teeth, no stock smiling faces). If you cannot verify URLs, stop and give me search terms instead.
+Store every image URL, alt text and photographer credit in content/clinic.ts under `images`, and render credits in a credits list in the repo.
 Done when: the Home page matches the copy, is responsive, and Lighthouse mobile performance is 95 or higher.
 ```
 
@@ -71,6 +73,7 @@ Read 01_ARCHITECTURE.md (Data model) and 04_KNOWLEDGE_BASE.md.
 2. Split 04_KNOWLEDGE_BASE.md into markdown files under content/knowledge/ by section.
 3. Implement lib/rag/embed.ts (single embedding provider behind one function), lib/db.ts (supabase server client), and scripts/ingest.ts that chunks each file by heading, embeds, and upserts (clear and re-insert on each run). Add an npm script "ingest" using tsx.
 Tell me exactly what to run and what to paste into the Supabase SQL editor.
+Enable row level security on kb_chunks and enquiries with no policies (all access goes through the server using the service role key).
 Done when: running the ingest script fills kb_chunks and a test query returns sensible chunks.
 ```
 
@@ -105,6 +108,7 @@ Decision point: if fewer than 18 of 20 scenarios pass after tuning the threshold
 ```
 Read 01_ARCHITECTURE.md (enquiry model, API contract) and 05_SITE_CONTENT.md (Contact success state).
 Implement app/api/enquiry/route.ts: zod validation, honeypot check, Upstash rate limit (3 per IP per hour), insert into enquiries, send a notification email to DEMO_INBOX_EMAIL via the configured SMTP or Resend, return the preview payload. Wire the form from P5 to it. Build the ClinicInboxPreview panel ("What the clinic receives") shown on success. Add scripts/cleanup-enquiries.ts deleting rows older than 7 days and an npm script "cleanup".
+Also add app/api/health/route.ts that runs a trivial Supabase query and returns ok, and a vercel.json cron that calls it once a day so the free database never pauses.
 Done when: submitting the form shows the success state and preview, stores the row, and emails my inbox.
 ```
 
