@@ -1,68 +1,123 @@
-import Image from "next/image";
+import { clinic } from "@/content/clinic";
+import { Reveal } from "@/components/reveal";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <div className="min-h-screen bg-bone text-ink p-6 md:p-12 flex flex-col items-center">
+      <main className="w-full max-w-4xl space-y-12">
+        {/* Sample Strip Test */}
+        <div className="bg-sand text-ink text-xs md:text-sm py-2 px-4 rounded-md flex justify-between items-center border border-line">
+          <span>{clinic.sampleLabels.topStrip}</span>
+          <a
+            href={clinic.sampleLabels.topStripLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-clay-text font-medium underline underline-offset-4"
+          >
+            zalvrohq.com
+          </a>
+        </div>
+
+        {/* Heading & Typography Demonstration */}
+        <div className="space-y-4">
+          <span className="text-xs font-semibold tracking-wider uppercase text-clay-text">
+            P1 Foundation Test
+          </span>
+          <h1 className="text-4xl md:text-6xl font-normal tracking-tight text-ink">
+            {clinic.tagline}
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-lg md:text-xl text-ink-soft max-w-2xl">
+            {clinic.subhead}
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+        {/* Colour Palette Swatches */}
+        <Reveal>
+          <div className="space-y-4">
+            <h2 className="text-2xl font-normal text-ink">Design Tokens</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-bone border border-line text-xs font-medium space-y-1">
+                <div className="w-full h-8 rounded bg-bone border border-line" />
+                <p className="text-ink">--bone</p>
+                <p className="text-ink-soft">#F6F2EA</p>
+              </div>
+              <div className="p-4 rounded-xl bg-paper border border-line text-xs font-medium space-y-1">
+                <div className="w-full h-8 rounded bg-paper border border-line" />
+                <p className="text-ink">--paper</p>
+                <p className="text-ink-soft">#FFFDF9</p>
+              </div>
+              <div className="p-4 rounded-xl bg-sand border border-line text-xs font-medium space-y-1">
+                <div className="w-full h-8 rounded bg-sand border border-line" />
+                <p className="text-ink">--sand</p>
+                <p className="text-ink-soft">#E9DFD2</p>
+              </div>
+              <div className="p-4 rounded-xl bg-line text-xs font-medium space-y-1">
+                <div className="w-full h-8 rounded bg-line" />
+                <p className="text-ink">--line</p>
+                <p className="text-ink-soft">#E2DACB</p>
+              </div>
+              <div className="p-4 rounded-xl bg-ink text-bone text-xs font-medium space-y-1">
+                <div className="w-full h-8 rounded bg-ink" />
+                <p>--ink</p>
+                <p className="opacity-80">#17263B</p>
+              </div>
+              <div className="p-4 rounded-xl bg-ink-soft text-bone text-xs font-medium space-y-1">
+                <div className="w-full h-8 rounded bg-ink-soft" />
+                <p>--ink-soft</p>
+                <p className="opacity-80">#4A5870</p>
+              </div>
+              <div className="p-4 rounded-xl bg-clay text-white text-xs font-medium space-y-1">
+                <div className="w-full h-8 rounded bg-clay" />
+                <p>--clay</p>
+                <p className="opacity-80">#B85C38</p>
+              </div>
+              <div className="p-4 rounded-xl bg-paper border border-line text-xs font-medium space-y-1">
+                <div className="w-full h-8 rounded bg-clay-text" />
+                <p className="text-clay-text">--clay-text</p>
+                <p className="text-ink-soft">#A84F2E</p>
+              </div>
+            </div>
+          </div>
+        </Reveal>
+
+        {/* Content File Data Verification via Reveal */}
+        <Reveal delay={0.1}>
+          <div className="p-6 rounded-xl bg-paper border border-line space-y-4">
+            <h2 className="text-2xl font-normal text-ink">
+              Clinic Source of Truth ({clinic.name})
+            </h2>
+            <div className="text-sm text-ink-soft space-y-2">
+              <p>
+                <strong className="text-ink">Address:</strong> {clinic.address.full}
+              </p>
+              <p>
+                <strong className="text-ink">Phone:</strong> {clinic.phone} |{" "}
+                <strong className="text-ink">Email:</strong> {clinic.email}
+              </p>
+              <p>
+                <strong className="text-ink">Hours:</strong> {clinic.hours.summary}
+              </p>
+              <p>
+                <strong className="text-ink">Services loaded:</strong>{" "}
+                {clinic.services.length} items (
+                {clinic.services.map((s) => s.name).join(", ")})
+              </p>
+              <p>
+                <strong className="text-ink">Team members loaded:</strong>{" "}
+                {clinic.team.length} items (
+                {clinic.team.map((t) => t.name).join(", ")})
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center px-6 py-2.5 rounded-full bg-clay text-white font-medium text-sm transition-colors hover:bg-clay-text"
+              >
+                {clinic.primaryCta.label}
+              </button>
+            </div>
+          </div>
+        </Reveal>
       </main>
     </div>
   );
