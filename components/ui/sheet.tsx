@@ -38,10 +38,9 @@ export function Sheet({
 }
 
 export function SheetTrigger({
-  asChild,
   children,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const context = useContext(SheetContext);
   if (!context) throw new Error("SheetTrigger must be used within Sheet");
 
@@ -132,11 +131,14 @@ export function SheetContent({
 
   if (!open) return null;
 
+  const sideClasses = side === "left" ? "justify-start" : "justify-end";
+  const borderClasses = side === "left" ? "border-r" : "border-l";
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex justify-end"
+      className={`fixed inset-0 z-50 flex ${sideClasses}`}
     >
       {/* Flat backdrop (no blur, flat color) */}
       <div
@@ -146,7 +148,7 @@ export function SheetContent({
       />
       {/* Panel */}
       <div
-        className={`relative z-50 w-full max-w-xs bg-paper border-l border-line p-6 shadow-none flex flex-col justify-between h-full transition-transform ${className}`}
+        className={`relative z-50 w-full max-w-xs bg-paper ${borderClasses} border-line p-6 shadow-none flex flex-col justify-between h-full transition-transform ${className}`}
       >
         <button
           type="button"
