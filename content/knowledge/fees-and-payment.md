@@ -1,0 +1,2 @@
+## Fees and payment
+Fees listed in this knowledge base are sample fees for demonstration and must be confirmed with the clinic. The clinic provides a written treatment plan and cost estimate before treatment. Payment methods: major credit and debit cards. Health fund rebates can be claimed on the spot at the clinic with an eligible health fund card (placeholder detail). Payment plans are not listed.

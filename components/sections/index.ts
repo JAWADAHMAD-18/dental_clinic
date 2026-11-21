@@ -5,3 +5,4 @@ export { TeamPreview } from "./TeamPreview";
 export { FeesSnapshot } from "./FeesSnapshot";
 export { Faq } from "./Faq";
 export { CtaBand } from "./CtaBand";
+export { MapEmbed } from "./MapEmbed";

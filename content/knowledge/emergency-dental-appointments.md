@@ -1,0 +1,2 @@
+## Emergency dental appointments
+We keep a small number of same-day appointments for urgent dental pain where possible. Call the clinic as early as you can on (02) 5550 0142. If you have trouble breathing or swallowing, spreading swelling of the face or neck, severe bleeding that won't stop, or a serious injury to the face or jaw, call 000 immediately or go to the nearest hospital emergency department.

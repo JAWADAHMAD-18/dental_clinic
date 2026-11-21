@@ -1,0 +1,2 @@
+## Frequently asked questions
+Do you see children? Yes, we welcome patients of all ages. Do I need a referral? No referral is needed for a general appointment. Is parking available? Paid street parking and a public car park are nearby. How often should I have a check-up? Many people visit every six months, but your dentist will advise what is right for you. Will I know the cost before treatment? Yes, the clinic explains recommended treatment and provides a cost estimate before proceeding.

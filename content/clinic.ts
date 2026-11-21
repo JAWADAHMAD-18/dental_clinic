@@ -58,6 +58,11 @@ export interface ClinicData {
     sat: string;
     sun: string;
   };
+  contactNotes: {
+    parking: string;
+    accessibility: string;
+    transit: string;
+  };
   sampleLabels: {
     topStrip: string;
     topStripLink: string;
@@ -106,6 +111,11 @@ export const clinic: ClinicData = {
     monFri: "Monday – Friday: 8:00 am – 6:00 pm",
     sat: "Saturday: 8:30 am – 1:00 pm",
     sun: "Sunday: Closed",
+  },
+  contactNotes: {
+    parking: "Paid street parking and a public multi-level car park are available within a 2-minute walk.",
+    accessibility: "Full step-free access from street level with direct lift access to our Level 1 suite.",
+    transit: "A short 4-minute walk from the central train station and connecting bus routes.",
   },
   sampleLabels: {
     topStrip: "Sample website designed by Zalvro. Placeholder content.",

@@ -1,0 +1,2 @@
+## Privacy
+This sample website collects only the minimum details needed to respond to an enquiry: name, a phone number or email, a preferred time, the reason for the visit and an optional short note. Please do not enter medical histories or other sensitive information. Enquiries in this demo are deleted after seven days. The design follows the principles of the Australian Privacy Principles but makes no claim of regulatory compliance.
