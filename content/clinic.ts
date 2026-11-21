@@ -2,7 +2,8 @@ export interface ClinicService {
   name: string;
   slug: string;
   shortDescription: string;
-  longDescription: string;
+  whatItIs: string;
+  whatToExpect: string;
   sampleFee: string;
 }
 
@@ -27,6 +28,15 @@ export interface ClinicFaq {
 export interface NavLink {
   label: string;
   href: string;
+}
+
+export interface ClinicImage {
+  url: string;
+  alt: string;
+  photographer: string;
+  photographerUrl: string;
+  width: number;
+  height: number;
 }
 
 export interface ClinicData {
@@ -65,7 +75,16 @@ export interface ClinicData {
   feeItems: ClinicFeeItem[];
   feeNotes: string[];
   team: ClinicTeamMember[];
+  about: {
+    heading: string;
+    subhead: string;
+    approachParagraph: string;
+    values: { title: string; description: string }[];
+  };
   faqs: ClinicFaq[];
+  images: {
+    hero: ClinicImage;
+  };
 }
 
 export const clinic: ClinicData = {
@@ -125,8 +144,10 @@ export const clinic: ClinicData = {
       slug: "check-up-and-clean",
       shortDescription:
         "Comprehensive examination, gentle scaling and polish, and preventive care plan.",
-      longDescription:
-        "A thorough examination of your teeth, gums, and oral tissue paired with gentle scaling and polishing to remove plaque and calculus. We discuss findings with you clearly before recommending any treatment.",
+      whatItIs:
+        "A routine check-up and professional clean is the cornerstone of preventive dental health. It includes a thorough examination of your teeth, gums, and oral tissue, followed by a gentle scale and polish to remove plaque and calculus deposits.",
+      whatToExpect:
+        "Your appointment lasts approximately 45 to 60 minutes. Your dentist will check for early signs of decay, measure gum health, take diagnostic digital X-rays if clinically necessary, and provide tailored oral hygiene advice. You will receive a written overview of any recommended care before anything proceeds.",
       sampleFee: "From AUD 195",
     },
     {
@@ -134,8 +155,10 @@ export const clinic: ClinicData = {
       slug: "fillings",
       shortDescription:
         "Tooth-coloured composite restorations to repair decay or damage seamlessly.",
-      longDescription:
-        "Durable, natural-looking composite resin matched to the shade of your teeth. We focus on gentle preparation and comfortable, lasting restorations.",
+      whatItIs:
+        "Fillings repair teeth damaged by decay, fractures, or wear. We use tooth-coloured composite resin materials that bond directly to your tooth structure and closely match your natural enamel colour.",
+      whatToExpect:
+        "We prioritize comfort with gentle numbing techniques and continuous checking. After gently removing compromised tooth material, the composite resin is layered and cured with a specialized light, then carefully shaped and polished to match your natural bite.",
       sampleFee: "From AUD 220 per tooth",
     },
     {
@@ -143,8 +166,10 @@ export const clinic: ClinicData = {
       slug: "childrens-care",
       shortDescription:
         "Gentle, stress-free check-ups and habit coaching for growing smiles.",
-      longDescription:
-        "A warm, patient introduction to the dental chair for infants, children, and teens. Includes gentle cleans, fissure sealants, and positive reinforcement in an unhurried setting.",
+      whatItIs:
+        "A dedicated, child-friendly approach to paediatric oral health. Early visits help children build confidence in the dental chair and develop positive lifelong habits.",
+      whatToExpect:
+        "We introduce equipment gently, counting teeth and demonstrating tools in a relaxed, playful way. Appointments include a gentle polish, fluoride application if appropriate, fissure sealants where indicated, and practical brushing advice for parents.",
       sampleFee: "From AUD 120",
     },
     {
@@ -152,8 +177,10 @@ export const clinic: ClinicData = {
       slug: "teeth-whitening",
       shortDescription:
         "Safe, dentist-supervised custom take-home whitening kits.",
-      longDescription:
-        "Custom-fitted trays crafted from precision impressions, paired with clinical-grade whitening gel for safe, steady brightening at home with minimal sensitivity.",
+      whatItIs:
+        "Dentist-supervised whitening designed to safely brighten discoloured or stained teeth. Our take-home kits use custom laboratory-fabricated trays that fit your teeth precisely.",
+      whatToExpect:
+        "We first perform a clinical exam to ensure your teeth and gums are healthy and suitable for whitening. We then take digital impressions to create your custom trays and provide clinical-grade whitening gel with clear daily instructions to minimise sensitivity.",
       sampleFee: "From AUD 450",
     },
     {
@@ -161,8 +188,10 @@ export const clinic: ClinicData = {
       slug: "clear-aligners",
       shortDescription:
         "Discreet orthodontic alignment for mild to moderate tooth straightening.",
-      longDescription:
-        "Custom clear aligners designed to gently guide teeth into place. Includes an initial assessment, digital scan, and stage-by-stage progress checks.",
+      whatItIs:
+        "A modern, transparent orthodontic option that straightens crowded, spaced, or misaligned teeth using a series of custom-moulded clear plastic aligners.",
+      whatToExpect:
+        "During your initial consultation, we examine your bite, take digital scans, and evaluate whether clear aligners suit your clinical needs. We discuss treatment timelines, expectations, and provide a full written treatment quote before ordering any aligners.",
       sampleFee: "AUD 95 (consultation)",
     },
     {
@@ -170,8 +199,10 @@ export const clinic: ClinicData = {
       slug: "emergency-care",
       shortDescription:
         "Prompt assessment and pain relief for urgent dental issues.",
-      longDescription:
-        "Same-day appointments reserved for toothaches, chipped teeth, trauma, or unexpected discomfort. We focus on diagnosing the cause and providing immediate relief.",
+      whatItIs:
+        "Priority appointments set aside daily for acute toothache, chipped or broken teeth, facial swelling, or dental trauma.",
+      whatToExpect:
+        "Our immediate focus is diagnosing the cause of pain, providing fast and effective relief, and stabilizing the tooth. If further treatment is required, your dentist will present clear options and costs for complete restorative treatment.",
       sampleFee: "Assessment from AUD 95",
     },
   ],
@@ -238,6 +269,30 @@ export const clinic: ClinicData = {
       bio: "Coordinates appointments, patient enquiries, and smooth daily practice operations.",
     },
   ],
+  about: {
+    heading: "About Alder & Finch",
+    subhead:
+      "A calm, general and family dental practice in central Sydney committed to clear explanations and unhurried care.",
+    approachParagraph:
+      "We believe that visiting the dentist should be calm, clear, and predictable. Our practice is designed to remove the tension often associated with dental visits: you will always be heard, procedures will be explained in plain language, and all costs are confirmed in writing before any work begins.",
+    values: [
+      {
+        title: "Calm and unhurried",
+        description:
+          "Quiet treatment rooms with natural light, gentle pacing, and extra time allocated so you never feel rushed.",
+      },
+      {
+        title: "Clear explanations",
+        description:
+          "We show you digital imaging, explain options in straightforward English, and answer every question before proceeding.",
+      },
+      {
+        title: "No cost surprises",
+        description:
+          "Written itemised estimates are provided before any treatment starts. We discuss what is essential now and what can wait.",
+      },
+    ],
+  },
   faqs: [
     {
       question: "How do I book an appointment?",
@@ -265,4 +320,14 @@ export const clinic: ClinicData = {
         "If you have severe pain, bleeding, or dental trauma, call us on (02) 5550 0142 or send an urgent enquiry. If you experience difficulty breathing, uncontrolled bleeding, or severe facial swelling, call 000 or visit hospital emergency immediately.",
     },
   ],
+  images: {
+    hero: {
+      url: "https://images.unsplash.com/photo-1629909613654-28e377c37b09",
+      alt: "Bright and calm dental treatment room with natural light, clean clinic equipment, and a potted plant",
+      photographer: "Ozkan Guner",
+      photographerUrl: "https://unsplash.com/@ozkanguner",
+      width: 1200,
+      height: 800,
+    },
+  },
 };
