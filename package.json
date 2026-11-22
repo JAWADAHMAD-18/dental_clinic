@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "ingest": "tsx scripts/ingest.ts"
+    "ingest": "tsx scripts/ingest.ts",
+    "test:chat": "tsx scripts/test-chat.ts",
+    "cleanup": "tsx scripts/cleanup-enquiries.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

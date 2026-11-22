@@ -57,7 +57,7 @@ function errorResponse(
 const SHORT_QUERY_CHARS = 8;
 
 // Pick the Groq model from env or fall back to a known fast model.
-const GROQ_MODEL = "llama-3.1-8b-instant";
+const GROQ_MODEL = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
 
 // ---------------------------------------------------------------------------
 // Route handler

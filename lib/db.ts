@@ -9,13 +9,15 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
 
 function createSupabaseClient() {
-  const url = env.SUPABASE_URL;
+  const rawUrl = env.SUPABASE_URL;
   const key = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
+  if (!rawUrl || !key) {
     throw new Error(
       "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set"
     );
   }
+  // Strip trailing /rest/v1 if present in env
+  const url = rawUrl.replace(/\/rest\/v1\/?$/, "");
   return createClient(url, key, {
     auth: { persistSession: false },
   });

@@ -34,6 +34,8 @@ export function EnquiryForm({ initialReason = "" }: { initialReason?: string }) 
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedData, setSubmittedData] = useState<EnquiryPreviewData | null>(
     null
   );
@@ -56,10 +58,12 @@ export function EnquiryForm({ initialReason = "" }: { initialReason?: string }) 
         return next;
       });
     }
+    if (serverError) setServerError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     const result = enquirySchema.safeParse(formData);
 
@@ -76,20 +80,57 @@ export function EnquiryForm({ initialReason = "" }: { initialReason?: string }) 
     }
 
     setErrors({});
-    const preview: EnquiryPreviewData = {
-      name: formData.name,
-      contact: formData.contact,
-      preferredTime: formData.preferredTime,
-      reason: formData.reason,
-      note: formData.note ? formData.note : undefined,
-      timestamp: new Date().toLocaleTimeString("en-AU", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      }),
-    };
+    setServerError(null);
+    setIsSubmitting(true);
 
-    setSubmittedData(preview);
+    try {
+      const res = await fetch("/api/enquiry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      if (res.status === 429) {
+        setServerError(
+          "You have submitted multiple enquiries recently. Please wait a while before submitting again."
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!res.ok) {
+        setServerError(
+          "We could not process your enquiry right now. Please check your details or call us directly."
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      const json = await res.json();
+      if (json.ok && json.preview) {
+        setSubmittedData(json.preview);
+      } else {
+        // Fallback to local preview data
+        setSubmittedData({
+          name: formData.name,
+          contact: formData.contact,
+          preferredTime: formData.preferredTime,
+          reason: formData.reason,
+          note: formData.note ? formData.note : undefined,
+          timestamp: new Date().toLocaleTimeString("en-AU", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          }),
+        });
+      }
+    } catch {
+      setServerError(
+        "Network connection error. Please check your internet or call us on (02) 5550 0142."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (submittedData) {
@@ -312,12 +353,23 @@ export function EnquiryForm({ initialReason = "" }: { initialReason?: string }) 
         )}
       </div>
 
+      {/* Server Error Alert */}
+      {serverError && (
+        <div
+          role="alert"
+          className="p-3.5 rounded-xl bg-clay/10 border border-clay/30 text-clay-text text-xs leading-relaxed"
+        >
+          {serverError}
+        </div>
+      )}
+
       {/* Submit Button */}
       <button
         type="submit"
-        className="w-full py-3.5 px-6 rounded-full bg-clay text-white text-sm font-medium hover:bg-clay-text transition-colors focus-visible:outline-2"
+        disabled={isSubmitting}
+        className="w-full py-3.5 px-6 rounded-full bg-clay text-white text-sm font-medium hover:bg-clay-text transition-colors focus-visible:outline-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
       >
-        Send enquiry
+        {isSubmitting ? "Sending enquiry..." : "Send enquiry"}
       </button>
 
       <p className="text-center text-xs text-ink-soft/80">
