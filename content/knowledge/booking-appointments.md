@@ -1,2 +1,2 @@
 ## Booking appointments
-This website assistant can't book appointments. Visitors can submit an enquiry using the form on the Contact page, choosing a preferred time and a reason for the visit. The clinic replies during business hours. The form should not include medical details.
+Visitors can book directly through this website assistant. Ask for a day or time, the assistant shows real available times, and the visitor confirms with their name and email using the booking form. A confirmation is emailed to the patient and the clinic. If no suitable time is available, visitors can use the enquiry form on the Contact page. This is a sample booking on a demonstration site; no real appointment is made.
