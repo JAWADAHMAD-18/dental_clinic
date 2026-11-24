@@ -1,7 +1,8 @@
 /**
  * lib/email.ts
  *
- * Sends enquiry notifications to DEMO_INBOX_EMAIL via configured Brevo SMTP or Resend.
+ * Sends notifications via configured Brevo SMTP (or Resend).
+ * From address: jawad@zalvrohq.com
  */
 
 import nodemailer from "nodemailer";
@@ -15,57 +16,149 @@ export interface EnquiryEmailPayload {
   note?: string;
 }
 
-export async function sendEnquiryEmail(details: EnquiryEmailPayload): Promise<{ subject: string; body: string }> {
+export interface AppointmentEmailPayload {
+  doctorId: string;
+  doctorName: string;
+  doctorEmail: string;
+  patientName: string;
+  patientEmail: string;
+  startsAt: Date;
+  label: string;
+}
+
+export interface AppointmentEmailPreview {
+  patient: { subject: string; body: string };
+  doctor: { subject: string; body: string };
+}
+
+function escapePlainText(text: string): string {
+  return text.replace(/[\r\n\x00-\x1F\x7F]/g, " ").trim();
+}
+
+/**
+ * Sends an enquiry notification to DEMO_INBOX_EMAIL.
+ */
+export async function sendEnquiryEmail(
+  details: EnquiryEmailPayload
+): Promise<{ subject: string; body: string }> {
   const to = env.DEMO_INBOX_EMAIL;
-  const subject = `New website enquiry: ${details.reason}`;
+  const safeName = escapePlainText(details.name);
+  const safeReason = escapePlainText(details.reason);
+  const subject = `New website enquiry: ${safeReason}`;
 
   const textBody = `
 New website enquiry received:
 
-Patient Name:   ${details.name}
-Contact:        ${details.contact}
-Preferred Time: ${details.preferredTime}
-Reason:         ${details.reason}
-${details.note ? `Note:           ${details.note}\n` : ""}
+Patient Name:   ${safeName}
+Contact:        ${escapePlainText(details.contact)}
+Preferred Time: ${escapePlainText(details.preferredTime)}
+Reason:         ${safeReason}
+${details.note ? `Note:           ${escapePlainText(details.note)}\n` : ""}
 Submitted at:   ${new Date().toLocaleString("en-AU", { timeZone: "Australia/Sydney" })}
 
 This is a sample enquiry notification from the Alder & Finch Dental demo website.
 `.trim();
 
   if (!to) {
-    console.warn("[email] DEMO_INBOX_EMAIL not configured, skipping notification");
     return { subject, body: textBody };
   }
 
-  // Option 1: Resend
-  if (env.RESEND_API_KEY) {
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: "Alder & Finch Dental <onboarding@resend.dev>",
-          to: [to],
-          subject,
-          text: textBody,
-        }),
-      });
+  await sendMail({
+    to,
+    subject,
+    text: textBody,
+  });
 
-      if (!res.ok) {
-        const err = await res.text();
-        console.error("[email] Resend API error:", err);
-      }
-    } catch (err) {
-      console.error("[email] Resend send error:", err);
-    }
+  return { subject, body: textBody };
+}
 
-    return { subject, body: textBody };
+/**
+ * Sends two appointment emails (patient confirmation + doctor notification)
+ * and returns previews for UI display.
+ */
+export async function sendAppointmentEmails(
+  payload: AppointmentEmailPayload
+): Promise<AppointmentEmailPreview> {
+  const safePatientName = escapePlainText(payload.patientName);
+  const safePatientEmail = escapePlainText(payload.patientEmail);
+  const safeDoctorName = escapePlainText(payload.doctorName);
+  const safeDoctorEmail = escapePlainText(payload.doctorEmail);
+  const safeLabel = escapePlainText(payload.label);
+
+  // 1. Patient Confirmation Email
+  const patientSubject =
+    "Your appointment request: Alder & Finch Dental (sample)";
+
+  const patientBody = `
+This is a sample booking made on a demo website and no real appointment exists.
+
+Dear ${safePatientName},
+
+Thank you for requesting an appointment with Alder & Finch Dental.
+
+Doctor:      ${safeDoctorName}
+Date & Time: ${safeLabel} (Australia/Sydney)
+Duration:    30 minutes
+Location:    Level 1, 12 Example Street, Sydney NSW 2000
+
+Please note that this is a sample booking made on a demonstration website created by Zalvro. No real appointment has been booked.
+
+Sample website designed by Zalvro. Reply to this email if you want it removed.
+`.trim();
+
+  // 2. Doctor Notification Email
+  const doctorSubject = `New booking: ${safePatientName} with ${safeDoctorName}, ${safeLabel}`;
+
+  const doctorBody = `
+New booking notification:
+
+Doctor:            ${safeDoctorName} (placeholder recipient: ${safeDoctorEmail})
+Date & Time:       ${safeLabel} (Australia/Sydney)
+Duration:          30 minutes
+Patient Name:      ${safePatientName}
+Patient Email:     ${safePatientEmail}
+Submitted at:      ${new Date().toLocaleString("en-AU", { timeZone: "Australia/Sydney" })}
+
+This notification was generated from the Alder & Finch Dental demo website.
+`.trim();
+
+  const preview: AppointmentEmailPreview = {
+    patient: { subject: patientSubject, body: patientBody },
+    doctor: { subject: doctorSubject, body: doctorBody },
+  };
+
+  // Deliver patient email to patientEmail
+  await sendMail({
+    to: safePatientEmail,
+    subject: patientSubject,
+    text: patientBody,
+  });
+
+  // Deliver doctor notification to DEMO_INBOX_EMAIL (not placeholder doctor email)
+  const doctorRecipient = env.DEMO_INBOX_EMAIL;
+  if (doctorRecipient) {
+    await sendMail({
+      to: doctorRecipient,
+      subject: doctorSubject,
+      text: doctorBody,
+    });
   }
 
-  // Option 2: SMTP (Brevo)
+  return preview;
+}
+
+// ---------------------------------------------------------------------------
+// Low-level mail transport
+// ---------------------------------------------------------------------------
+
+async function sendMail(options: {
+  to: string;
+  subject: string;
+  text: string;
+}): Promise<void> {
+  const from = "Alder & Finch Dental <jawad@zalvrohq.com>";
+
+  // 1. Try Brevo / SMTP first
   if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS) {
     try {
       const port = Number(env.SMTP_PORT) || 587;
@@ -79,55 +172,41 @@ This is a sample enquiry notification from the Alder & Finch Dental demo website
         },
       });
 
-      const htmlBody = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e7e5e4; border-radius: 12px; background-color: #fafaf9;">
-          <h2 style="color: #1c1917; margin-top: 0; font-size: 20px; font-weight: 600;">New website enquiry</h2>
-          <p style="color: #78716c; font-size: 14px; margin-top: 4px;">A new appointment enquiry has been submitted through the Alder & Finch Dental website.</p>
-          <hr style="border: none; border-top: 1px solid #e7e5e4; margin: 20px 0;" />
-          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-            <tr>
-              <td style="padding: 8px 0; color: #78716c; width: 140px;"><strong>Patient Name:</strong></td>
-              <td style="padding: 8px 0; color: #1c1917; font-weight: 500;">${details.name}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; color: #78716c;"><strong>Contact Info:</strong></td>
-              <td style="padding: 8px 0; color: #1c1917; font-weight: 500;">${details.contact}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; color: #78716c;"><strong>Preferred Time:</strong></td>
-              <td style="padding: 8px 0; color: #1c1917; font-weight: 500;">${details.preferredTime}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; color: #78716c;"><strong>Reason for Visit:</strong></td>
-              <td style="padding: 8px 0; color: #1c1917; font-weight: 500;">${details.reason}</td>
-            </tr>
-            ${
-              details.note
-                ? `<tr>
-              <td style="padding: 8px 0; color: #78716c; vertical-align: top;"><strong>Patient Note:</strong></td>
-              <td style="padding: 8px 0; color: #1c1917;">${details.note}</td>
-            </tr>`
-                : ""
-            }
-          </table>
-          <hr style="border: none; border-top: 1px solid #e7e5e4; margin: 20px 0;" />
-          <p style="color: #a8a29e; font-size: 12px; margin-bottom: 0; font-style: italic;">
-            This is a sample enquiry notification from the Alder & Finch Dental demo website.
-          </p>
-        </div>
-      `;
-
       await transporter.sendMail({
-        from: `"Alder & Finch Dental" <${env.SMTP_USER}>`,
-        to,
-        subject,
-        text: textBody,
-        html: htmlBody,
+        from,
+        to: options.to,
+        subject: options.subject,
+        text: options.text,
       });
+      return;
     } catch (err) {
-      console.error("[email] SMTP send error:", err);
+      console.error("[email] SMTP transport error:", err);
     }
   }
 
-  return { subject, body: textBody };
+  // 2. Try Resend if configured
+  if (env.RESEND_API_KEY) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from,
+          to: [options.to],
+          subject: options.subject,
+          text: options.text,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("[email] Resend API error:", errText);
+      }
+    } catch (err) {
+      console.error("[email] Resend transport error:", err);
+    }
+  }
 }

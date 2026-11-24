@@ -53,3 +53,30 @@ export function enquiryIpLimiter() {
     prefix: "rl:enquiry:ip",
   });
 }
+
+/** 2 bookings per IP per day */
+export function bookingIpLimiter() {
+  return new Ratelimit({
+    redis: redis(),
+    limiter: Ratelimit.slidingWindow(2, "1 d"),
+    prefix: "rl:booking:ip",
+  });
+}
+
+/** 1 booking per email per 24 hours */
+export function bookingEmailLimiter() {
+  return new Ratelimit({
+    redis: redis(),
+    limiter: Ratelimit.slidingWindow(1, "1 d"),
+    prefix: "rl:booking:email",
+  });
+}
+
+/** 20 bookings globally per day */
+export function bookingGlobalLimiter() {
+  return new Ratelimit({
+    redis: redis(),
+    limiter: Ratelimit.slidingWindow(20, "1 d"),
+    prefix: "rl:booking:global",
+  });
+}

@@ -1,8 +1,9 @@
 /**
  * scripts/cleanup-enquiries.ts
  *
- * Deletes enquiry rows older than 7 days from the enquiries table
- * (and any local fallback records) to comply with privacy retention policy.
+ * Deletes rows older than 7 days from both the enquiries and appointments
+ * tables (and any local fallback records) to comply with the privacy
+ * retention policy.
  *
  * Usage:
  *   npm run cleanup
@@ -40,32 +41,45 @@ const RETENTION_DAYS = 7;
 const cutoffDate = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
 const cutoffIso = cutoffDate.toISOString();
 
-async function cleanupSupabase(): Promise<number> {
+async function cleanupSupabase(): Promise<{
+  enquiries: number;
+  appointments: number;
+}> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.log("[cleanup] Supabase credentials not set, skipping database cleanup.");
-    return 0;
+    console.log(
+      "[cleanup] Supabase credentials not set, skipping database cleanup."
+    );
+    return { enquiries: 0, appointments: 0 };
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });
 
-  try {
-    const { error, count } = await supabase
-      .from("enquiries")
-      .delete({ count: "exact" })
-      .lt("created_at", cutoffIso);
+  async function deleteTable(table: string): Promise<number> {
+    try {
+      const { error, count } = await supabase
+        .from(table)
+        .delete({ count: "exact" })
+        .lt("created_at", cutoffIso);
 
-    if (error) {
-      console.warn(`[cleanup] Supabase deletion notice: ${error.message}`);
+      if (error) {
+        console.warn(`[cleanup] ${table} deletion notice: ${error.message}`);
+        return 0;
+      }
+      return count ?? 0;
+    } catch (err) {
+      console.warn(`[cleanup] ${table} connection error:`, err);
       return 0;
     }
-
-    return count ?? 0;
-  } catch (err) {
-    console.warn("[cleanup] Supabase connection error:", err);
-    return 0;
   }
+
+  const [enquiries, appointments] = await Promise.all([
+    deleteTable("enquiries"),
+    deleteTable("appointments"),
+  ]);
+
+  return { enquiries, appointments };
 }
 
 function cleanupLocal(): number {
@@ -95,21 +109,26 @@ function cleanupLocal(): number {
 
 async function main() {
   console.log(`\n======================================================`);
-  console.log(`ENQUIRY RETENTION CLEANUP (7-DAY RETENTION POLICY)`);
+  console.log(`RETENTION CLEANUP (7-DAY POLICY) — enquiries + appointments`);
   console.log(`Cutoff timestamp: ${cutoffIso}`);
   console.log(`======================================================\n`);
 
-  const supabaseDeleted = await cleanupSupabase();
+  const { enquiries: enquiriesDeleted, appointments: appointmentsDeleted } =
+    await cleanupSupabase();
   const localDeleted = cleanupLocal();
 
-  const total = supabaseDeleted + localDeleted;
-  console.log(`✓ Supabase enquiries removed: ${supabaseDeleted}`);
+  console.log(`✓ Supabase enquiries removed:    ${enquiriesDeleted}`);
+  console.log(`✓ Supabase appointments removed: ${appointmentsDeleted}`);
   console.log(`✓ Local fallback records removed: ${localDeleted}`);
-  console.log(`\nTotal enquiries older than ${RETENTION_DAYS} days removed: ${total}`);
+  console.log(
+    `\nTotal rows older than ${RETENTION_DAYS} days removed: ${
+      enquiriesDeleted + appointmentsDeleted + localDeleted
+    }`
+  );
   console.log(`✅ Retention cleanup complete.\n`);
 }
 
 main().catch((err) => {
-  console.error("Fatal error during enquiry cleanup:", err);
+  console.error("Fatal error during retention cleanup:", err);
   process.exit(1);
 });
