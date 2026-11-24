@@ -66,3 +66,44 @@ as $$
   order by embedding <=> query_embedding
   limit match_count;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Booking: doctors, working hours, appointments
+-- ---------------------------------------------------------------------------
+create extension if not exists btree_gist;
+
+create table if not exists doctors (
+  id text primary key,            -- slug, e.g. 'dr-a'
+  name text not null,
+  role text not null,
+  email text not null,            -- placeholder, example.com
+  active boolean default true
+);
+
+create table if not exists working_hours (
+  doctor_id text references doctors(id) on delete cascade,
+  weekday int not null check (weekday between 0 and 6),   -- 0 = Sunday
+  start_time time not null,
+  end_time time not null
+);
+
+create table if not exists appointments (
+  id uuid primary key default gen_random_uuid(),
+  doctor_id text not null references doctors(id),
+  patient_name text not null,
+  patient_email text not null,
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  status text not null default 'booked' check (status in ('booked','cancelled')),
+  created_at timestamptz default now(),
+  constraint no_double_booking exclude using gist (
+    doctor_id with =,
+    tstzrange(starts_at, ends_at) with &&
+  ) where (status = 'booked')
+);
+
+alter table doctors enable row level security;
+alter table working_hours enable row level security;
+alter table appointments enable row level security;
+-- no policies: all access goes through the server with the service role key
+

@@ -20,6 +20,21 @@ export interface ClinicTeamMember {
   bio: string;
 }
 
+export interface WorkingHourRule {
+  weekday: number; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  startTime: string; // "HH:MM"
+  endTime: string; // "HH:MM"
+}
+
+export interface ClinicDoctor {
+  id: string; // slug, e.g. 'dr-a'
+  name: string;
+  role: string;
+  email: string;
+  active: boolean;
+  workingHours: WorkingHourRule[];
+}
+
 export interface ClinicFaq {
   question: string;
   answer: string;
@@ -80,6 +95,7 @@ export interface ClinicData {
   feeItems: ClinicFeeItem[];
   feeNotes: string[];
   team: ClinicTeamMember[];
+  doctors: ClinicDoctor[];
   about: {
     heading: string;
     subhead: string;
@@ -277,6 +293,46 @@ export const clinic: ClinicData = {
       initials: "DP",
       role: "Practice Manager",
       bio: "Coordinates appointments, patient enquiries, and smooth daily practice operations.",
+    },
+  ],
+  doctors: [
+    {
+      id: "dr-a",
+      name: "Dr. A. Placeholder",
+      role: "Principal Dentist",
+      email: "dr.a@example.com",
+      active: true,
+      workingHours: [
+        { weekday: 1, startTime: "08:30", endTime: "17:00" },
+        { weekday: 2, startTime: "08:30", endTime: "17:00" },
+        { weekday: 3, startTime: "08:30", endTime: "17:00" },
+        { weekday: 4, startTime: "08:30", endTime: "19:00" },
+      ],
+    },
+    {
+      id: "dr-b",
+      name: "Dr. B. Placeholder",
+      role: "Associate Dentist",
+      email: "dr.b@example.com",
+      active: true,
+      workingHours: [
+        { weekday: 3, startTime: "09:00", endTime: "17:30" },
+        { weekday: 4, startTime: "09:00", endTime: "17:30" },
+        { weekday: 5, startTime: "08:30", endTime: "17:30" },
+        { weekday: 6, startTime: "08:30", endTime: "12:30" },
+      ],
+    },
+    {
+      id: "hygienist-c",
+      name: "C. Placeholder",
+      role: "Dental Hygienist",
+      email: "c.placeholder@example.com",
+      active: true,
+      workingHours: [
+        { weekday: 1, startTime: "09:00", endTime: "16:30" },
+        { weekday: 2, startTime: "09:00", endTime: "16:30" },
+        { weekday: 5, startTime: "09:00", endTime: "16:30" },
+      ],
     },
   ],
   about: {

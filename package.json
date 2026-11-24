@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "ingest": "tsx scripts/ingest.ts",
+    "seed": "tsx scripts/seed-doctors.ts",
     "test:chat": "tsx scripts/test-chat.ts",
     "cleanup": "tsx scripts/cleanup-enquiries.ts"
   },
