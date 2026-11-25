@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MessageSquare, X, Send } from "lucide-react";
 import { clinic } from "@/content/clinic";
-import { ChatMessageUI } from "./types";
+import { ChatMessageUI, Slot, AppointmentConfirmed } from "./types";
 import { MessageList } from "./MessageList";
 import { SuggestedQuestions } from "./SuggestedQuestions";
 
@@ -136,14 +136,6 @@ export function ChatWidget() {
           return;
         }
 
-        const basedOnHeader = res.headers.get("X-Based-On");
-        const basedOn = basedOnHeader
-          ? basedOnHeader
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
-          : [];
-
         // Insert assistant placeholder
         setMessages((prev) => [
           ...prev,
@@ -151,7 +143,6 @@ export function ChatWidget() {
             id: assistantMsgId,
             role: "assistant",
             content: "",
-            basedOn: basedOn.length > 0 ? basedOn : undefined,
           },
         ]);
 
@@ -159,27 +150,111 @@ export function ChatWidget() {
         if (!reader) throw new Error("Stream reader unavailable");
 
         const decoder = new TextDecoder();
-        let accumulated = "";
+        let buffer = "";
+        let accumulatedText = "";
+        let hasSlots = false;
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          accumulated += chunk;
 
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMsgId ? { ...msg, content: accumulated } : msg
-            )
-          );
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) continue;
+
+            try {
+              const event = JSON.parse(trimmedLine);
+
+              if (event.type === "sources" && Array.isArray(event.headings)) {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMsgId
+                      ? { ...msg, basedOn: event.headings }
+                      : msg
+                  )
+                );
+              } else if (event.type === "slots") {
+                hasSlots = (event.slots && event.slots.length > 0) || (event.alternatives && event.alternatives.length > 0);
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMsgId
+                      ? {
+                          ...msg,
+                          slots: event.slots ?? [],
+                          alternatives: event.alternatives ?? [],
+                        }
+                      : msg
+                  )
+                );
+              } else if (event.type === "text" && typeof event.delta === "string") {
+                accumulatedText += event.delta;
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMsgId
+                      ? { ...msg, content: accumulatedText }
+                      : msg
+                  )
+                );
+              } else if (event.type === "error" && event.code) {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMsgId
+                      ? {
+                          ...msg,
+                          error:
+                            event.code === "rate_limited"
+                              ? "rate_limited"
+                              : "unavailable",
+                        }
+                      : msg
+                  )
+                );
+              }
+            } catch {
+              // Ignore partial JSON lines
+            }
+          }
         }
 
-        // Final update with booking intent analysis
-        const isBooking = checkBookingIntent(accumulated, trimmed);
+        // Flush any remaining buffer line
+        if (buffer.trim()) {
+          try {
+            const event = JSON.parse(buffer.trim());
+            if (event.type === "text" && typeof event.delta === "string") {
+              accumulatedText += event.delta;
+            } else if (event.type === "slots") {
+              hasSlots = (event.slots && event.slots.length > 0) || (event.alternatives && event.alternatives.length > 0);
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMsgId
+                    ? {
+                        ...msg,
+                        slots: event.slots ?? [],
+                        alternatives: event.alternatives ?? [],
+                      }
+                    : msg
+                )
+              );
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        // Final booking intent check
+        const isBooking = checkBookingIntent(accumulatedText, trimmed);
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId
-              ? { ...msg, content: accumulated, isBookingIntent: isBooking }
+              ? {
+                  ...msg,
+                  content: accumulatedText,
+                  isBookingIntent: isBooking && !hasSlots,
+                }
               : msg
           )
         );
@@ -214,10 +289,68 @@ export function ChatWidget() {
 
   const handleRetry = () => {
     if (lastUserPromptRef.current) {
-      // Remove failed assistant message before retrying
       setMessages((prev) => prev.filter((m) => !m.error));
       sendMessage(lastUserPromptRef.current);
     }
+  };
+
+  // Slot booking interactions
+  const handleSelectSlot = (msgId: string, slot: Slot) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === msgId
+          ? { ...msg, selectedSlot: slot, slotTakenNotice: null }
+          : msg
+      )
+    );
+  };
+
+  const handleBackFromBooking = (msgId: string) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === msgId ? { ...msg, selectedSlot: null } : msg
+      )
+    );
+  };
+
+  const handleBookingSuccess = (
+    msgId: string,
+    confirmed: AppointmentConfirmed
+  ) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === msgId
+          ? {
+              ...msg,
+              selectedSlot: null,
+              confirmedAppointment: confirmed,
+              slotTakenNotice: null,
+            }
+          : msg
+      )
+    );
+  };
+
+  const handleSlotTaken = (
+    msgId: string,
+    freshSlots?: Slot[],
+    freshAlts?: Slot[]
+  ) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === msgId
+          ? {
+              ...msg,
+              selectedSlot: null,
+              slots: freshSlots !== undefined ? freshSlots : msg.slots,
+              alternatives:
+                freshAlts !== undefined ? freshAlts : msg.alternatives,
+              slotTakenNotice:
+                "That time was just booked by someone else. Please choose another time from the updated list:",
+            }
+          : msg
+      )
+    );
   };
 
   return (
@@ -246,7 +379,7 @@ export function ChatWidget() {
         role="dialog"
         aria-label="Alder, virtual assistant chat"
         aria-modal="true"
-        className={`fixed bottom-24 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[400px] h-[540px] max-h-[calc(100vh-7rem)] bg-paper border border-line rounded-2xl shadow-xl flex flex-col overflow-hidden transition-all duration-200 origin-bottom-right motion-reduce:transition-none ${
+        className={`fixed bottom-24 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[420px] h-[580px] max-h-[calc(100vh-7rem)] bg-paper border border-line rounded-2xl shadow-xl flex flex-col overflow-hidden transition-all duration-200 origin-bottom-right motion-reduce:transition-none ${
           isOpen
             ? "opacity-100 scale-100 pointer-events-auto"
             : "opacity-0 scale-95 pointer-events-none"
@@ -259,8 +392,8 @@ export function ChatWidget() {
               Alder, virtual assistant
             </h2>
             <p className="text-xs text-sand/90 mt-0.5 leading-relaxed">
-              I answer questions about the clinic using its published
-              information. I&apos;m an AI, not a dentist.
+              I answer questions about the clinic and help check appointment
+              times. I&apos;m an AI, not a dentist.
             </p>
           </div>
           <button
@@ -290,6 +423,10 @@ export function ChatWidget() {
           isLoading={isLoading}
           onRetry={handleRetry}
           onCloseChat={() => setIsOpen(false)}
+          onSelectSlot={handleSelectSlot}
+          onBackFromBooking={handleBackFromBooking}
+          onBookingSuccess={handleBookingSuccess}
+          onSlotTaken={handleSlotTaken}
         />
 
         {/* Input area */}
@@ -305,13 +442,15 @@ export function ChatWidget() {
               maxLength={MAX_CHARS}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask a question..."
+              placeholder="Ask a question or request a time..."
               className="w-full resize-none bg-transparent px-3 py-2 text-sm text-ink placeholder:text-ink-soft/70 focus:outline-none max-h-24"
             />
             <div className="flex items-center gap-2 pr-2">
               <span
                 className={`text-[10px] tabular-nums font-mono ${
-                  input.length >= MAX_CHARS ? "text-clay font-medium" : "text-ink-soft/80"
+                  input.length >= MAX_CHARS
+                    ? "text-clay font-medium"
+                    : "text-ink-soft/80"
                 }`}
                 aria-live="polite"
               >

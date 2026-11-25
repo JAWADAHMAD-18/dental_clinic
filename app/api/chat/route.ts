@@ -28,6 +28,8 @@
  */
 
 import { NextRequest } from "next/server";
+import fs from "fs";
+import path from "path";
 import Groq from "groq-sdk";
 import { ChatRequestSchema, sanitise } from "@/lib/rag/guard";
 import { retrieve } from "@/lib/rag/retrieve";
@@ -36,6 +38,28 @@ import { chatIpLimiter, chatGlobalLimiter } from "@/lib/ratelimit";
 import { getAvailability } from "@/lib/booking/slots";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+
+const LOCAL_APPOINTMENTS_PATH = path.join(
+  process.cwd(),
+  "data",
+  "appointments.json"
+);
+
+function getLocalAppointments(): Array<{
+  doctor_id: string;
+  starts_at: string;
+  ends_at: string;
+  status: "booked" | "cancelled";
+}> {
+  try {
+    if (fs.existsSync(LOCAL_APPOINTMENTS_PATH)) {
+      return JSON.parse(fs.readFileSync(LOCAL_APPOINTMENTS_PATH, "utf8"));
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -67,7 +91,7 @@ function ndjsonLine(obj: Record<string, unknown>): Uint8Array {
 const SHORT_QUERY_CHARS = 8;
 
 // Pick the Groq model from env or fall back to a known fast model.
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
+const GROQ_MODEL = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
 
 // ---------------------------------------------------------------------------
 // Tool definition
@@ -216,14 +240,14 @@ export async function POST(req: NextRequest): Promise<Response> {
           firstResponse = await groq.chat.completions.create({
             model: GROQ_MODEL,
             messages: groqMessages,
-            max_tokens: 350,
+            max_tokens: 300,
             temperature: 0.3,
             tools: [SHOW_AVAILABILITY_TOOL],
             tool_choice: "auto",
             stream: false,
           });
-        } catch {
-          console.error("[chat] Groq first-pass failed");
+        } catch (err) {
+          console.error("[chat] Groq first-pass failed:", err);
           enqueue({ type: "error", code: "unavailable" });
           enqueue({ type: "done" });
           controller.close();
@@ -255,14 +279,18 @@ export async function POST(req: NextRequest): Promise<Response> {
               }> = [];
 
               try {
-                const { data } = await db()
+                const { data, error } = await db()
                   .from("appointments")
                   .select("doctor_id,starts_at,ends_at,status")
                   .eq("status", "booked")
                   .gte("starts_at", new Date().toISOString());
-                bookedAppointments = (data ?? []) as typeof bookedAppointments;
+                if (error) {
+                  bookedAppointments = getLocalAppointments();
+                } else {
+                  bookedAppointments = (data ?? []) as typeof bookedAppointments;
+                }
               } catch {
-                console.error("[chat] DB fetch for booked appointments failed");
+                bookedAppointments = getLocalAppointments();
               }
 
               const availability = getAvailability(
@@ -312,7 +340,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             groqStream = await groq.chat.completions.create({
               model: GROQ_MODEL,
               messages: messagesWithTool,
-              max_tokens: 350,
+              max_tokens: 300,
               temperature: 0.3,
               stream: true,
             });
@@ -346,7 +374,7 @@ export async function POST(req: NextRequest): Promise<Response> {
               groqStream = await groq.chat.completions.create({
                 model: GROQ_MODEL,
                 messages: groqMessages,
-                max_tokens: 350,
+                max_tokens: 300,
                 temperature: 0.3,
                 stream: true,
               });

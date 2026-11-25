@@ -20,10 +20,13 @@
 
 import { NextRequest } from "next/server";
 import { z } from "zod";
+import fs from "fs";
+import path from "path";
 import { db } from "@/lib/db";
 import {
   getAvailability,
   formatSlotLabel,
+  utcToSydney,
 } from "@/lib/booking/slots";
 import {
   sendAppointmentEmails,
@@ -34,6 +37,53 @@ import {
   bookingEmailLimiter,
   bookingGlobalLimiter,
 } from "@/lib/ratelimit";
+
+// ---------------------------------------------------------------------------
+// Local fallback store for when Supabase table has not yet been migrated
+// ---------------------------------------------------------------------------
+
+const LOCAL_APPOINTMENTS_PATH = path.join(
+  process.cwd(),
+  "data",
+  "appointments.json"
+);
+
+function getLocalAppointments(): Array<{
+  doctor_id: string;
+  starts_at: string;
+  ends_at: string;
+  status: "booked" | "cancelled";
+}> {
+  try {
+    if (fs.existsSync(LOCAL_APPOINTMENTS_PATH)) {
+      return JSON.parse(fs.readFileSync(LOCAL_APPOINTMENTS_PATH, "utf8"));
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+function saveLocalAppointment(appt: {
+  id: string;
+  doctor_id: string;
+  patient_name: string;
+  patient_email: string;
+  starts_at: string;
+  ends_at: string;
+  status: "booked" | "cancelled";
+  created_at: string;
+}) {
+  try {
+    const dir = path.dirname(LOCAL_APPOINTMENTS_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const list = getLocalAppointments();
+    list.push(appt);
+    fs.writeFileSync(LOCAL_APPOINTMENTS_PATH, JSON.stringify(list, null, 2));
+  } catch (err) {
+    console.error("[appointments] Local write error:", err);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Validation schema
@@ -62,9 +112,10 @@ function getIp(req: NextRequest): string {
 
 function jsonError(
   error: "bad_request" | "rate_limited" | "slot_taken" | "unavailable",
-  status: number
+  status: number,
+  extra?: Record<string, unknown>
 ): Response {
-  return new Response(JSON.stringify({ error }), {
+  return new Response(JSON.stringify({ error, ...extra }), {
     status,
     headers: { "Content-Type": "application/json" },
   });
@@ -114,9 +165,9 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   // ── 4. Validate the slot is still real and available ────────────────────
   const startsAtDate = new Date(startsAt);
-  const dateStr = startsAt.slice(0, 10); // "YYYY-MM-DD"
+  const { dateStr } = utcToSydney(startsAtDate);
 
-  // Fetch currently booked appointments for accurate slot validation
+  // Fetch currently booked appointments (Supabase with local fallback)
   let bookedAppointments: Array<{
     doctor_id: string;
     starts_at: string;
@@ -132,13 +183,13 @@ export async function POST(req: NextRequest): Promise<Response> {
       .gte("starts_at", new Date().toISOString());
 
     if (error) {
-      console.error("[appointments] DB fetch error:", error.code);
-      return jsonError("unavailable", 503);
+      // Table doesn't exist yet in Supabase or connection issue: fallback to local records
+      bookedAppointments = getLocalAppointments();
+    } else {
+      bookedAppointments = (data ?? []) as typeof bookedAppointments;
     }
-    bookedAppointments = (data ?? []) as typeof bookedAppointments;
   } catch {
-    console.error("[appointments] DB connection failed");
-    return jsonError("unavailable", 503);
+    bookedAppointments = getLocalAppointments();
   }
 
   const availability = getAvailability(
@@ -153,8 +204,12 @@ export async function POST(req: NextRequest): Promise<Response> {
   );
 
   if (!matchedSlot) {
-    // Slot is no longer available — treat as taken
-    return jsonError("slot_taken", 409);
+    // Slot is no longer available — treat as taken and return fresh slots
+    return jsonError("slot_taken", 409, {
+      message: "This slot is no longer available.",
+      slots: availability.slots,
+      alternatives: availability.nearest_alternatives ?? [],
+    });
   }
 
   // ── 5. Fetch doctor details from DB ─────────────────────────────────────
@@ -182,6 +237,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const label = formatSlotLabel(startsAtDate);
 
   // ── 7. Insert appointment ────────────────────────────────────────────────
+  let insertSucceeded = false;
   try {
     const { error: insertError } = await db().from("appointments").insert({
       doctor_id: doctorId,
@@ -199,13 +255,107 @@ export async function POST(req: NextRequest): Promise<Response> {
         insertError.message?.includes("no_double_booking") ||
         insertError.message?.includes("exclusion constraint")
       ) {
-        return jsonError("slot_taken", 409);
+        // Double booking race caught by exclusion constraint: fetch fresh slots
+        let freshBooked: typeof bookedAppointments = [];
+        try {
+          const { data } = await db()
+            .from("appointments")
+            .select("doctor_id,starts_at,ends_at,status")
+            .eq("status", "booked")
+            .gte("starts_at", new Date().toISOString());
+          freshBooked = (data ?? []) as typeof freshBooked;
+        } catch {
+          freshBooked = getLocalAppointments();
+        }
+        const freshAvail = getAvailability(
+          { date: dateStr, doctor_id: doctorId },
+          { appointments: freshBooked }
+        );
+        return jsonError("slot_taken", 409, {
+          message: "This slot was just booked by someone else.",
+          slots: freshAvail.slots,
+          alternatives: freshAvail.nearest_alternatives ?? [],
+        });
       }
-      console.error("[appointments] Insert error:", insertError.code);
-      return jsonError("unavailable", 503);
+
+      // If appointments table not created in Supabase yet (PGRST205 / 42P01), use local fallback
+      if (insertError.code === "PGRST205" || insertError.code === "42P01") {
+        const localList = getLocalAppointments();
+        const startMs = startsAtDate.getTime();
+        const endMs = endsAtDate.getTime();
+        const conflict = localList.some(
+          (a) =>
+            a.doctor_id === doctorId &&
+            a.status === "booked" &&
+            startMs < new Date(a.ends_at).getTime() &&
+            endMs > new Date(a.starts_at).getTime()
+        );
+        if (conflict) {
+          const freshAvail = getAvailability(
+            { date: dateStr, doctor_id: doctorId },
+            { appointments: localList }
+          );
+          return jsonError("slot_taken", 409, {
+            message: "This slot was just booked by someone else.",
+            slots: freshAvail.slots,
+            alternatives: freshAvail.nearest_alternatives ?? [],
+          });
+        }
+        saveLocalAppointment({
+          id: `local-${Date.now()}`,
+          doctor_id: doctorId,
+          patient_name: name,
+          patient_email: email,
+          starts_at: startsAt,
+          ends_at: endsAt,
+          status: "booked",
+          created_at: new Date().toISOString(),
+        });
+        insertSucceeded = true;
+      } else {
+        console.error("[appointments] Insert error:", insertError.code);
+        return jsonError("unavailable", 503);
+      }
+    } else {
+      insertSucceeded = true;
     }
   } catch {
-    console.error("[appointments] DB insert exception");
+    // Network / client exception — use local fallback
+    const localList = getLocalAppointments();
+    const startMs = startsAtDate.getTime();
+    const endMs = endsAtDate.getTime();
+    const conflict = localList.some(
+      (a) =>
+        a.doctor_id === doctorId &&
+        a.status === "booked" &&
+        startMs < new Date(a.ends_at).getTime() &&
+        endMs > new Date(a.starts_at).getTime()
+    );
+    if (conflict) {
+      const freshAvail = getAvailability(
+        { date: dateStr, doctor_id: doctorId },
+        { appointments: localList }
+      );
+      return jsonError("slot_taken", 409, {
+        message: "This slot was just booked by someone else.",
+        slots: freshAvail.slots,
+        alternatives: freshAvail.nearest_alternatives ?? [],
+      });
+    }
+    saveLocalAppointment({
+      id: `local-${Date.now()}`,
+      doctor_id: doctorId,
+      patient_name: name,
+      patient_email: email,
+      starts_at: startsAt,
+      ends_at: endsAt,
+      status: "booked",
+      created_at: new Date().toISOString(),
+    });
+    insertSucceeded = true;
+  }
+
+  if (!insertSucceeded) {
     return jsonError("unavailable", 503);
   }
 

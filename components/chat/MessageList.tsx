@@ -4,14 +4,21 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowRight, RotateCcw, AlertCircle } from "lucide-react";
 import { clinic } from "@/content/clinic";
-import { ChatMessageUI } from "./types";
+import { ChatMessageUI, Slot, AppointmentConfirmed } from "./types";
 import { TypingIndicator } from "./TypingIndicator";
+import { SlotsCard } from "./SlotsCard";
+import { BookingForm } from "./BookingForm";
+import { ConfirmationCard } from "./ConfirmationCard";
 
 interface MessageListProps {
   messages: ChatMessageUI[];
   isLoading: boolean;
   onRetry?: () => void;
   onCloseChat?: () => void;
+  onSelectSlot: (msgId: string, slot: Slot) => void;
+  onBackFromBooking: (msgId: string) => void;
+  onBookingSuccess: (msgId: string, confirmed: AppointmentConfirmed) => void;
+  onSlotTaken: (msgId: string, freshSlots?: Slot[], freshAlts?: Slot[]) => void;
 }
 
 export function MessageList({
@@ -19,6 +26,10 @@ export function MessageList({
   isLoading,
   onRetry,
   onCloseChat,
+  onSelectSlot,
+  onBackFromBooking,
+  onBookingSuccess,
+  onSlotTaken,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -35,25 +46,31 @@ export function MessageList({
     >
       {messages.map((msg) => {
         const isUser = msg.role === "user";
+        const hasSlots =
+          (msg.slots && msg.slots.length > 0) ||
+          (msg.alternatives && msg.alternatives.length > 0);
 
         return (
           <div
             key={msg.id}
             className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
           >
-            <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
-                isUser
-                  ? "bg-ink text-bone rounded-tr-sm"
-                  : "bg-paper text-ink border border-line rounded-tl-sm shadow-xs"
-              }`}
-            >
-              {msg.content}
-            </div>
+            {/* Text message bubble */}
+            {msg.content && (
+              <div
+                className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                  isUser
+                    ? "bg-ink text-bone rounded-tr-sm"
+                    : "bg-paper text-ink border border-line rounded-tl-sm shadow-xs"
+                }`}
+              >
+                {msg.content}
+              </div>
+            )}
 
             {/* Error states */}
             {msg.error && (
-              <div className="mt-2 text-xs text-clay-text bg-clay/10 border border-clay/20 rounded-lg p-2.5 max-w-[85%] space-y-2">
+              <div className="mt-2 text-xs text-clay-text bg-clay/10 border border-clay/20 rounded-lg p-2.5 max-w-[88%] space-y-2">
                 <div className="flex items-start gap-1.5">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-clay" />
                   <div>
@@ -81,7 +98,10 @@ export function MessageList({
                       </p>
                     )}
                     {msg.error === "network" && (
-                      <p>Something went wrong connecting to Alder. Please check your connection and try again.</p>
+                      <p>
+                        Something went wrong connecting to Alder. Please check
+                        your connection and try again.
+                      </p>
                     )}
                   </div>
                 </div>
@@ -106,19 +126,45 @@ export function MessageList({
               </p>
             )}
 
-            {/* "Make an enquiry" booking action button */}
-            {!isUser && msg.isBookingIntent && (
-              <div className="mt-2.5">
-                <Link
-                  href="/contact"
-                  onClick={onCloseChat}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-clay text-white text-xs font-medium hover:bg-clay-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                >
-                  <span>Make an enquiry</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+            {/* Interactive booking cards */}
+            {!isUser && (
+              <div className="max-w-[92%] w-full">
+                {msg.confirmedAppointment ? (
+                  <ConfirmationCard confirmed={msg.confirmedAppointment} />
+                ) : msg.selectedSlot ? (
+                  <BookingForm
+                    slot={msg.selectedSlot}
+                    onBack={() => onBackFromBooking(msg.id)}
+                    onSuccess={(c) => onBookingSuccess(msg.id, c)}
+                    onSlotTaken={(s, a) => onSlotTaken(msg.id, s, a)}
+                  />
+                ) : hasSlots ? (
+                  <SlotsCard
+                    slots={msg.slots}
+                    alternatives={msg.alternatives}
+                    slotTakenNotice={msg.slotTakenNotice}
+                    onSelectSlot={(slot) => onSelectSlot(msg.id, slot)}
+                  />
+                ) : null}
               </div>
             )}
+
+            {/* "Make an enquiry" fallback button if booking intent detected without interactive slots */}
+            {!isUser &&
+              msg.isBookingIntent &&
+              !hasSlots &&
+              !msg.confirmedAppointment && (
+                <div className="mt-2.5">
+                  <Link
+                    href="/contact"
+                    onClick={onCloseChat}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-clay text-white text-xs font-medium hover:bg-clay-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  >
+                    <span>Make an enquiry</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              )}
           </div>
         );
       })}
